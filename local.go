@@ -73,7 +73,7 @@ func Local(f Function, initX []float64, settings *Settings, method Method) (*Res
 	optLoc := &Location{}
 	// update stats (grad norm, function value, etc.) so that things are
 	// initialized for the first convergence check
-	update(location, optLoc, stats, funcInfo, NoEvaluation, NoIteration, startTime)
+	update(location, optLoc, stats, NoIteration, startTime)
 
 	if settings.Recorder != nil {
 		err = settings.Recorder.Init(funcInfo)
@@ -136,12 +136,12 @@ func minimize(settings *Settings, location Location, method Method, funcInfo *Fu
 		}
 
 		// Compute the new function and update the statistics
-		err = evaluate(funcs, funcInfo, evalType, xNext, &location)
+		err = evaluate(funcs, funcInfo, evalType, stats, xNext, &location)
 		if err != nil {
 			status = Failure
 			return
 		}
-		update(location, optLoc, stats, funcInfo, evalType, iterType, startTime)
+		update(location, optLoc, stats, iterType, startTime)
 
 		// Find the next location
 		evalType, iterType, err = method.Iterate(location, xNext)
@@ -199,12 +199,12 @@ func getStartingLocation(funcs functions, funcInfo *FunctionInfo, initX []float6
 	var l Location
 
 	l.X = make([]float64, len(initX))
-	copy(l.X, initX)
 	if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
 		l.Gradient = make([]float64, len(initX))
 	}
 
 	if settings.UseInitialData {
+		copy(l.X, initX)
 		l.F = settings.InitialFunctionValue
 		initG := settings.InitialGradient
 		if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
@@ -215,16 +215,10 @@ func getStartingLocation(funcs functions, funcInfo *FunctionInfo, initX []float6
 		}
 	} else {
 		// Compute missing information in the initial state.
-		if funcInfo.IsFunctionGradient {
-			l.F = funcs.gradFunc.FDf(l.X, l.Gradient)
-			stats.FunctionGradientEvals++
+		if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
+			evaluate(funcs, funcInfo, FunctionAndGradientEval, stats, initX, &l)
 		} else {
-			l.F = funcs.function.F(l.X)
-			stats.FunctionEvals++
-			if funcInfo.IsGradient {
-				funcs.gradient.Df(l.X, l.Gradient)
-				stats.GradientEvals++
-			}
+			evaluate(funcs, funcInfo, FunctionEval, stats, initX, &l)
 		}
 	}
 
@@ -283,12 +277,13 @@ func checkConvergence(loc Location, itertype IterationType, stats *Stats, settin
 	return NotTerminated
 }
 
-// evaluate evaluates the function and stores the answer in place
-func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, xNext []float64, location *Location) error {
+// evaluate evaluates the function, updates the stats and stores the answer in place
+func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, stats *Stats, xNext []float64, location *Location) error {
 	copy(location.X, xNext)
 	switch evalType {
 	case FunctionEval:
 		location.F = funcs.function.F(location.X)
+		stats.FunctionEvals++
 		for i := range location.Gradient {
 			location.Gradient[i] = math.NaN()
 		}
@@ -297,21 +292,26 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 		location.F = math.NaN()
 		if funcInfo.IsGradient {
 			funcs.gradient.Df(location.X, location.Gradient)
+			stats.GradientEvals++
 			return nil
 		}
 		if funcInfo.IsFunctionGradient {
 			location.F = funcs.gradFunc.FDf(location.X, location.Gradient)
+			stats.FunctionGradientEvals++
 			return nil
 		}
 		return ErrMismatch{Type: evalType}
 	case FunctionAndGradientEval:
 		if funcInfo.IsFunctionGradient {
 			location.F = funcs.gradFunc.FDf(location.X, location.Gradient)
+			stats.FunctionGradientEvals++
 			return nil
 		}
 		if funcInfo.IsGradient {
 			location.F = funcs.function.F(location.X)
 			funcs.gradient.Df(location.X, location.Gradient)
+			stats.FunctionEvals++
+			stats.GradientEvals++
 			return nil
 		}
 		return ErrMismatch{Type: evalType}
@@ -321,24 +321,7 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 }
 
 // update updates the stats given the new evaluation
-func update(location Location, optLoc *Location, stats *Stats, funcInfo *FunctionInfo, evalType EvaluationType, iterType IterationType, startTime time.Time) {
-	switch evalType {
-	case FunctionEval:
-		stats.FunctionEvals++
-	case GradientEval:
-		if funcInfo.IsGradient {
-			stats.GradientEvals++
-		} else if funcInfo.IsFunctionGradient {
-			stats.FunctionGradientEvals++
-		}
-	case FunctionAndGradientEval:
-		if funcInfo.IsFunctionGradient {
-			stats.FunctionGradientEvals++
-		} else if funcInfo.IsGradient {
-			stats.FunctionEvals++
-			stats.GradientEvals++
-		}
-	}
+func update(location Location, optLoc *Location, stats *Stats, iterType IterationType, startTime time.Time) {
 	if iterType == MajorIteration {
 		stats.MajorIterations++
 	}
