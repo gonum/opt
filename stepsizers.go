@@ -110,3 +110,32 @@ func (q *QuadraticStepSize) StepSize(l Location, projGrad, stepSizePrev float64)
 	q.fPrev = l.F
 	return stepsize
 }
+
+type ApproximateStepSize struct {
+	InitialStepFactor float64
+	MinStepSize       float64
+
+	projGradPrev float64
+}
+
+func (a *ApproximateStepSize) Init(l Location, dir []float64) (stepSize float64) {
+	if a.InitialStepFactor == 0 {
+		a.InitialStepFactor = 1
+	}
+	if a.MinStepSize == 0 {
+		a.MinStepSize = minStepSize
+	}
+
+	dirNorm := floats.Norm(dir, math.Inf(1))
+	stepSize = math.Max(a.MinStepSize, a.InitialStepFactor/dirNorm)
+
+	a.projGradPrev = floats.Dot(l.Gradient, dir)
+	return stepSize
+}
+
+func (a *ApproximateStepSize) StepSize(l Location, projGrad, stepSizePrev float64) (stepSize float64) {
+	stepSize = stepSizePrev * a.projGradPrev / projGrad
+	stepSize = math.Max(a.MinStepSize, stepSize)
+	a.projGradPrev = projGrad
+	return stepSize
+}
