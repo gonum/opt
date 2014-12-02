@@ -18,6 +18,7 @@ import (
 // iteration. If LinesearchMethod == nil, an appropriate default is chosen.
 type LBFGS struct {
 	LinesearchMethod LinesearchMethod
+	InitialStep      StepSizer
 	Store            int // how many past iterations to store
 
 	linesearch *Linesearch
@@ -42,10 +43,14 @@ func (l *LBFGS) Init(loc Location, f *FunctionInfo, xNext []float64) (Evaluation
 	if l.LinesearchMethod == nil {
 		l.LinesearchMethod = &Bisection{}
 	}
+	if l.InitialStep == nil {
+		l.InitialStep = &NewtonStepSize{}
+	}
 	if l.linesearch == nil {
 		l.linesearch = &Linesearch{}
 	}
 	l.linesearch.Method = l.LinesearchMethod
+	l.linesearch.InitialStep = l.InitialStep
 	l.linesearch.NextDirectioner = l
 	return l.linesearch.Init(loc, f, xNext)
 }
@@ -54,7 +59,7 @@ func (l *LBFGS) Iterate(loc Location, xNext []float64) (EvaluationType, Iteratio
 	return l.linesearch.Iterate(loc, xNext)
 }
 
-func (l *LBFGS) InitDirection(loc Location, direction []float64) (stepSize float64) {
+func (l *LBFGS) InitDirection(loc Location, direction []float64) {
 	dim := len(loc.X)
 	l.dim = dim
 
@@ -99,11 +104,9 @@ func (l *LBFGS) InitDirection(loc Location, direction []float64) (stepSize float
 
 	copy(direction, loc.Gradient)
 	floats.Scale(-1, direction)
-
-	return 1 / floats.Norm(direction, 2)
 }
 
-func (l *LBFGS) NextDirection(loc Location, direction []float64) (stepSize float64) {
+func (l *LBFGS) NextDirection(loc Location, direction []float64) {
 	if len(loc.X) != l.dim {
 		panic("lbfgs: unexpected size mismatch")
 	}
@@ -155,6 +158,4 @@ func (l *LBFGS) NextDirection(loc Location, direction []float64) (stepSize float
 		floats.AddScaled(direction, l.a[idx]-beta, l.sHist[idx])
 	}
 	floats.Scale(-1, direction)
-
-	return 1
 }

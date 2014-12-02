@@ -13,22 +13,23 @@ import "github.com/gonum/floats"
 // are nil, a reasonable value will be chosen.
 type GradientDescent struct {
 	LinesearchMethod LinesearchMethod
-	StepSizer        StepSizer
+	InitialStep      StepSizer
 
 	linesearch *Linesearch
 }
 
 func (g *GradientDescent) Init(l Location, f *FunctionInfo, xNext []float64) (EvaluationType, IterationType, error) {
-	if g.StepSizer == nil {
-		g.StepSizer = &QuadraticStepSize{}
-	}
 	if g.LinesearchMethod == nil {
 		g.LinesearchMethod = &Backtracking{}
+	}
+	if g.InitialStep == nil {
+		g.InitialStep = &QuadraticStepSize{}
 	}
 	if g.linesearch == nil {
 		g.linesearch = &Linesearch{}
 	}
 	g.linesearch.Method = g.LinesearchMethod
+	g.linesearch.InitialStep = g.InitialStep
 	g.linesearch.NextDirectioner = g
 
 	return g.linesearch.Init(l, f, xNext)
@@ -38,14 +39,12 @@ func (g *GradientDescent) Iterate(l Location, xNext []float64) (EvaluationType, 
 	return g.linesearch.Iterate(l, xNext)
 }
 
-func (g *GradientDescent) InitDirection(l Location, direction []float64) (stepSize float64) {
+func (g *GradientDescent) InitDirection(l Location, direction []float64) {
 	copy(direction, l.Gradient)
 	floats.Scale(-1, direction)
-	return g.StepSizer.Init(l, direction)
 }
 
-func (g *GradientDescent) NextDirection(l Location, direction []float64) (stepSize float64) {
+func (g *GradientDescent) NextDirection(l Location, direction []float64) {
 	copy(direction, l.Gradient)
 	floats.Scale(-1, direction)
-	return g.StepSizer.StepSize(l, direction)
 }
