@@ -51,6 +51,7 @@ func (l *Linesearch) Init(loc Location, f *FunctionInfo, xNext []float64) (Evalu
 	stepSize := l.InitialStep.Init(loc, l.direction)
 	evalType := l.Method.Init(linesearchLocation, stepSize, f)
 	floats.AddScaledTo(xNext, l.initLoc, stepSize, l.direction)
+	l.stepSizePrev = stepSize
 	l.funInfo = f
 	l.lastEvalType = evalType
 	l.finished = false
