@@ -22,8 +22,31 @@ func (c ConstantStepSize) Init(l Location, dir []float64) float64 {
 	return c.Size
 }
 
-func (c ConstantStepSize) StepSize(l Location, dir []float64) float64 {
+func (c ConstantStepSize) StepSize(l Location, projGrad, stepSizePrev float64) float64 {
 	return c.Size
+}
+
+type NewtonStepSize struct {
+	InitialStepFactor float64
+	MinStepSize       float64
+}
+
+func (n *NewtonStepSize) Init(l Location, dir []float64) (stepSize float64) {
+	if n.InitialStepFactor == 0 {
+		n.InitialStepFactor = 1
+	}
+	if n.MinStepSize == 0 {
+		n.MinStepSize = minStepSize
+	}
+
+	dirNorm := floats.Norm(dir, math.Inf(1))
+	stepSize = math.Max(n.MinStepSize, n.InitialStepFactor/dirNorm)
+
+	return stepSize
+}
+
+func (n *NewtonStepSize) StepSize(l Location, projGrad, stepSizePrev float64) (stepSize float64) {
+	return 1
 }
 
 // QuadraticStepSize estimates the initial line search step size as the minimum
@@ -67,7 +90,7 @@ func (q *QuadraticStepSize) Init(l Location, dir []float64) (stepsize float64) {
 	return stepsize
 }
 
-func (q *QuadraticStepSize) StepSize(l Location, dir []float64) (stepsize float64) {
+func (q *QuadraticStepSize) StepSize(l Location, projGrad, stepSizePrev float64) (stepsize float64) {
 	stepsize = 1
 	t := 1.0
 	if !floats.EqualWithinAbsOrRel(l.F, 0, 1e-8, 1e-6) {
@@ -79,11 +102,40 @@ func (q *QuadraticStepSize) StepSize(l Location, dir []float64) (stepsize float6
 		// a quadratic interpolant.
 		// Assuming that the received direction is a descent direction,
 		// stepsize will be positive.
-		stepsize = 2 * (l.F - q.fPrev) / floats.Dot(l.Gradient, dir)
+		stepsize = 2 * (l.F - q.fPrev) / projGrad
 		// Trim the step size to lie in [MinStepSize, 1]
 		stepsize = math.Max(q.MinStepSize, math.Min(1.01*stepsize, 1))
 	}
 
 	q.fPrev = l.F
 	return stepsize
+}
+
+type ApproximateStepSize struct {
+	InitialStepFactor float64
+	MinStepSize       float64
+
+	projGradPrev float64
+}
+
+func (a *ApproximateStepSize) Init(l Location, dir []float64) (stepSize float64) {
+	if a.InitialStepFactor == 0 {
+		a.InitialStepFactor = 1
+	}
+	if a.MinStepSize == 0 {
+		a.MinStepSize = minStepSize
+	}
+
+	dirNorm := floats.Norm(dir, math.Inf(1))
+	stepSize = math.Max(a.MinStepSize, a.InitialStepFactor/dirNorm)
+
+	a.projGradPrev = floats.Dot(l.Gradient, dir)
+	return stepSize
+}
+
+func (a *ApproximateStepSize) StepSize(l Location, projGrad, stepSizePrev float64) (stepSize float64) {
+	stepSize = stepSizePrev * a.projGradPrev / projGrad
+	stepSize = math.Max(a.MinStepSize, stepSize)
+	a.projGradPrev = projGrad
+	return stepSize
 }

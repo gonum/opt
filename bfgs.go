@@ -5,8 +5,6 @@
 package optimize
 
 import (
-	"math"
-
 	"github.com/gonum/floats"
 	"github.com/gonum/matrix/mat64"
 )
@@ -21,6 +19,7 @@ import (
 // O(n^2) relative to the input dimension.
 type BFGS struct {
 	LinesearchMethod LinesearchMethod
+	InitialStep      StepSizer
 
 	linesearch *Linesearch
 
@@ -45,10 +44,14 @@ func (b *BFGS) Init(l Location, f *FunctionInfo, xNext []float64) (EvaluationTyp
 	if b.LinesearchMethod == nil {
 		b.LinesearchMethod = &Bisection{}
 	}
+	if b.InitialStep == nil {
+		b.InitialStep = &NewtonStepSize{}
+	}
 	if b.linesearch == nil {
 		b.linesearch = &Linesearch{}
 	}
 	b.linesearch.Method = b.LinesearchMethod
+	b.linesearch.InitialStep = b.InitialStep
 	b.linesearch.NextDirectioner = b
 
 	return b.linesearch.Init(l, f, xNext)
@@ -58,7 +61,7 @@ func (b *BFGS) Iterate(l Location, xNext []float64) (EvaluationType, IterationTy
 	return b.linesearch.Iterate(l, xNext)
 }
 
-func (b *BFGS) InitDirection(l Location, dir []float64) (stepSize float64) {
+func (b *BFGS) InitDirection(l Location, dir []float64) {
 	dim := len(l.X)
 	b.dim = dim
 
@@ -83,16 +86,9 @@ func (b *BFGS) InitDirection(l Location, dir []float64) (stepSize float64) {
 	floats.Scale(-1, dir)
 
 	b.first = true
-
-	// Decrease the initial step size by a factor of sqrt(||grad||). This should help
-	// prevent bad initial line searches due to excessively large or small initial
-	// gradients. The hessian will be updated after the first completed line search,
-	// so this decision should only have a big effect on the very first line search.
-	floats.Scale(1/math.Sqrt(floats.Norm(dir, 2)), dir)
-	return 1
 }
 
-func (b *BFGS) NextDirection(l Location, direction []float64) (stepSize float64) {
+func (b *BFGS) NextDirection(l Location, direction []float64) {
 	if len(l.X) != b.dim {
 		panic("bfgs: unexpected size mismatch")
 	}
@@ -177,5 +173,4 @@ func (b *BFGS) NextDirection(l Location, direction []float64) (stepSize float64)
 
 	dirmat.Mul(b.invHess, gradmat) // new direction stored in place
 	floats.Scale(-1, direction)
-	return 1
 }

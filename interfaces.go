@@ -45,16 +45,15 @@ type LinesearchMethod interface {
 // at each major iteration. Typically, these methods will not be called by the user directly,
 // as they will be called by a Linesearch struct.
 type NextDirectioner interface {
-	// InitDirection initializes the NextDirectioner at the given starting location,
-	// putting the initial direction in place into dir, and returning the initial
-	// step size. InitDirection must not modify Location.
-	InitDirection(l Location, dir []float64) (stepSize float64)
+	// InitDirection initializes the NextDirectioner at the given starting
+	// location and puts the initial direction in place into dir. InitDirection
+	// must not modify Location.
+	InitDirection(l Location, dir []float64)
 
-	// NextDirection updates the search direction and step size. Location is
-	// the location seen at the conclusion of the most recent linesearch. The
-	// next search direction is put in place into dir, and the next stepsize
-	// is returned. NextDirection must not modify Location.
-	NextDirection(l Location, dir []float64) (stepSize float64)
+	// NextDirection computes the next search direction and puts it in place
+	// into dir. Location l is the location seen at the conclusion of the most
+	// recent linesearch. NextDirection must not modify Location.
+	NextDirection(l Location, dir []float64)
 }
 
 // A Method can optimize an objective function.
@@ -66,10 +65,11 @@ type Method interface {
 	Iterate(l Location, xNext []float64) (EvaluationType, IterationType, error)
 }
 
-// StepSizer can set the next step size of the optimization given the last Location.
+// StepSizer can determine the initial linesearch step size at the beginning of
+// each major iteration
 type StepSizer interface {
 	Init(l Location, dir []float64) float64
-	StepSize(l Location, dir []float64) float64
+	StepSize(l Location, projGrad, stepSizePrev float64) float64
 }
 
 // Statuser returns the status of the Function being optimized. This can be used
