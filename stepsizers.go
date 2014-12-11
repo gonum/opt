@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	minimumQuadraticStepSize  = 1e-8
+	defaultMinimumStepSize    = 1e-3
 	defaultQuadraticThreshold = 1e-12
 )
 
@@ -46,6 +46,9 @@ type QuadraticStepSize struct {
 	// The step size at the first iteration is estimated as InitialStepFactor / |g|_∞.
 	// If InitialStepFactor is zero, it will be set to one.
 	InitialStepFactor float64
+	// The estimated step size is always greater than or equal to MinStepSize.
+	// If MinStepSize is zero, it will be set to 1e-3.
+	MinStepSize float64
 
 	fPrev        float64
 	dirPrevNorm  float64
@@ -61,9 +64,12 @@ func (q *QuadraticStepSize) Init(l Location, dir []float64) (stepSize float64) {
 	if q.InitialStepFactor == 0 {
 		q.InitialStepFactor = 1
 	}
+	if q.MinStepSize == 0 {
+		q.MinStepSize = defaultMinimumStepSize
+	}
 
 	gNorm := floats.Norm(l.Gradient, math.Inf(1))
-	stepSize = math.Max(minimumQuadraticStepSize, q.InitialStepFactor/gNorm)
+	stepSize = math.Max(q.MinStepSize, q.InitialStepFactor/gNorm)
 
 	q.fPrev = l.F
 	q.dirPrevNorm = floats.Norm(dir, 2)
@@ -90,8 +96,8 @@ func (q *QuadraticStepSize) StepSize(l Location, dir []float64) (stepSize float6
 			stepSize *= 1.1
 		}
 	}
-	// Bound the step away from zero
-	stepSize = math.Max(minimumQuadraticStepSize, stepSize)
+	// Bound the step size away from zero
+	stepSize = math.Max(q.MinStepSize, stepSize)
 
 	q.fPrev = l.F
 	q.dirPrevNorm = floats.Norm(dir, 2)
