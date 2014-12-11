@@ -34,14 +34,11 @@ func (c ConstantStepSize) StepSize(l Location, dir []float64) float64 {
 // This is useful for line search methods that do not produce well-scaled
 // descent directions, such as gradient descent or conjugate gradient methods.
 // The step size is bounded away from zero.
-//
-// See also Nocedal, Wright (2006), Numerical Optimization (2nd ed.), sec.
-// 3.5, page 59.
 type QuadraticStepSize struct {
 	// If the relative change in the objective function is larger than
 	// Threshold, the step size is estimated by quadratic interpolation,
 	// otherwise it is set to 2*previous step size.
-	// Default value is 1e-12
+	// Default value is 1e-12.
 	Threshold float64
 	// The step size at the first iteration is estimated as InitialStepFactor / |g|_∞.
 	// If InitialStepFactor is zero, it will be set to one.
