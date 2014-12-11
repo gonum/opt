@@ -87,13 +87,16 @@ func (q *QuadraticStepSize) StepSize(l Location, dir []float64) (stepSize float6
 		// Two consecutive function values are not relatively equal, so
 		// computing the minimum of a quadratic interpolant might make sense
 
-		quadTest := (l.F-q.fPrev)/stepSizePrev - q.projGradPrev
+		df := (l.F - q.fPrev) / stepSizePrev
+		quadTest := df - q.projGradPrev
 		if quadTest > 0 {
 			// There is a chance of approximating the function well by a
 			// quadratic only if the finite difference (f_k-f_{k-1})/stepSizePrev
 			// is larger than ∇f_{k-1}⋅p_{k-1}
-			stepSize = 2 * (l.F - q.fPrev) / projGrad
-			stepSize *= 1.1
+
+			// Set the step size to the minimizer of the quadratic function that
+			// interpolates f_{k-1}, ∇f_{k-1}⋅p_{k-1} and f_k
+			stepSize = -q.projGradPrev * stepSizePrev / quadTest / 2
 		}
 	}
 	// Bound the step size away from zero
