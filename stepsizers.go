@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	defaultInitialStepFactor = 1
-	defaultMinimumStepSize   = 1e-3
-	defaultMaximumStepSize   = 1.01
+	initialStepFactor = 1
 
-	defaultQuadraticThreshold = 1e-12
+	quadraticMinimumStepSize = 1e-3
+	quadraticMaximumStepSize = 1.01
+	quadraticThreshold       = 1e-12
 )
 
 // ConstantStepSize is a StepSizer that returns the same step size for
@@ -63,16 +63,16 @@ type QuadraticStepSize struct {
 func (q *QuadraticStepSize) Init(l Location, dir []float64) (stepSize float64) {
 	q.xPrev = resize(q.xPrev, len(l.X))
 	if q.Threshold == 0 {
-		q.Threshold = defaultQuadraticThreshold
+		q.Threshold = quadraticThreshold
 	}
 	if q.InitialStepFactor == 0 {
-		q.InitialStepFactor = defaultInitialStepFactor
+		q.InitialStepFactor = initialStepFactor
 	}
 	if q.MinStepSize == 0 {
-		q.MinStepSize = defaultMinimumStepSize
+		q.MinStepSize = quadraticMinimumStepSize
 	}
 	if q.MaxStepSize == 0 {
-		q.MaxStepSize = defaultMaximumStepSize
+		q.MaxStepSize = quadraticMaximumStepSize
 	}
 
 	gNorm := floats.Norm(l.Gradient, math.Inf(1))
