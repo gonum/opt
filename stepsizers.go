@@ -41,7 +41,7 @@ type QuadraticStepSize struct {
 	// If the relative change in the objective function is larger than
 	// Threshold, the step size is estimated by quadratic interpolation,
 	// otherwise it is set to 2*previous step size.
-	// Default value is 1e-12.
+	// The default value is 1e-12.
 	Threshold float64
 	// The step size at the first iteration is estimated as InitialStepFactor / |g|_∞.
 	// If InitialStepFactor is zero, it will be set to one.
