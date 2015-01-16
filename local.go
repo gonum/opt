@@ -212,6 +212,7 @@ func getStartingLocation(f Function, funcs functions, funcInfo *FunctionInfo, in
 			}
 			loc.Gradient = make([]float64, dim)
 			copy(loc.Gradient, initG)
+			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 		}
 	} else {
 		// Compute missing information in the initial state.
@@ -286,6 +287,7 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 	switch evalType {
 	case FunctionEval:
 		loc.F = funcs.function.F(loc.X)
+		stats.FunctionEvals++
 		if !sameX {
 			for i := range loc.Gradient {
 				loc.Gradient[i] = math.NaN()
@@ -299,11 +301,13 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 				loc.F = math.NaN()
 			}
 			funcs.gradient.Df(loc.X, loc.Gradient)
+			stats.GradientEvals++
 			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
 		if funcInfo.IsFunctionGradient {
 			loc.F = funcs.gradFunc.FDf(loc.X, loc.Gradient)
+			stats.FunctionGradientEvals++
 			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
@@ -311,12 +315,15 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 	case FunctionAndGradientEval:
 		if funcInfo.IsFunctionGradient {
 			loc.F = funcs.gradFunc.FDf(loc.X, loc.Gradient)
+			stats.FunctionGradientEvals++
 			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
 		if funcInfo.IsGradient {
 			loc.F = funcs.function.F(loc.X)
+			stats.FunctionEvals++
 			funcs.gradient.Df(loc.X, loc.Gradient)
+			stats.GradientEvals++
 			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
@@ -328,23 +335,6 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 
 // update updates the stats given the new evaluation
 func update(stats *Stats, funcInfo *FunctionInfo, evalType EvaluationType, iterType IterationType, startTime time.Time) {
-	switch evalType {
-	case FunctionEval:
-		stats.FunctionEvals++
-	case GradientEval:
-		if funcInfo.IsGradient {
-			stats.GradientEvals++
-		} else if funcInfo.IsFunctionGradient {
-			stats.FunctionGradientEvals++
-		}
-	case FunctionAndGradientEval:
-		if funcInfo.IsFunctionGradient {
-			stats.FunctionGradientEvals++
-		} else if funcInfo.IsGradient {
-			stats.FunctionEvals++
-			stats.GradientEvals++
-		}
-	}
 	if iterType == MajorIteration {
 		stats.MajorIterations++
 	}
