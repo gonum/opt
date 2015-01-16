@@ -65,7 +65,7 @@ func Local(f Function, initX []float64, settings *Settings, method Method) (*Res
 	}
 
 	stats := &Stats{}
-	location, err := getStartingLocation(f, funcs, funcInfo, initX, stats, settings)
+	loc, err := getStartingLocation(f, funcs, funcInfo, initX, stats, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -82,39 +82,39 @@ func Local(f Function, initX []float64, settings *Settings, method Method) (*Res
 	}
 
 	// actually perform the minimization
-	status, err := minimize(settings, location, method, funcInfo, stats, funcs, startTime)
+	status, err := minimize(settings, loc, method, funcInfo, stats, funcs, startTime)
 
 	// cleanup at exit
 	if settings.Recorder != nil && err == nil {
-		err = settings.Recorder.Record(*location, NoEvaluation, PostIteration, stats)
+		err = settings.Recorder.Record(*loc, NoEvaluation, PostIteration, stats)
 	}
 	stats.Runtime = time.Since(startTime)
 	return &Result{
 		Stats:    *stats,
-		Location: *location,
+		Location: *loc,
 		Status:   status,
 	}, err
 }
 
-func minimize(settings *Settings, location *Location, method Method, funcInfo *FunctionInfo, stats *Stats, funcs functions, startTime time.Time) (status Status, err error) {
+func minimize(settings *Settings, loc *Location, method Method, funcInfo *FunctionInfo, stats *Stats, funcs functions, startTime time.Time) (status Status, err error) {
 	methodStatus, methodIsStatuser := method.(Statuser)
-	xNext := make([]float64, len(location.X))
+	xNext := make([]float64, len(loc.X))
 
-	evalType, iterType, err := method.Init(*location, funcInfo, xNext)
+	evalType, iterType, err := method.Init(*loc, funcInfo, xNext)
 	if err != nil {
 		return Failure, err
 	}
 
 	for {
 		if settings.Recorder != nil {
-			err = settings.Recorder.Record(*location, evalType, iterType, stats)
+			err = settings.Recorder.Record(*loc, evalType, iterType, stats)
 			if err != nil {
 				status = Failure
 				return
 			}
 		}
 
-		status = checkConvergence(*location, iterType, stats, settings)
+		status = checkConvergence(*loc, iterType, stats, settings)
 		if status != NotTerminated {
 			return
 		}
@@ -134,7 +134,7 @@ func minimize(settings *Settings, location *Location, method Method, funcInfo *F
 		}
 
 		// Compute the new function and update the statistics
-		err = evaluate(funcs, funcInfo, evalType, xNext, location, stats)
+		err = evaluate(funcs, funcInfo, evalType, xNext, loc, stats)
 		if err != nil {
 			status = Failure
 			return
@@ -142,7 +142,7 @@ func minimize(settings *Settings, location *Location, method Method, funcInfo *F
 		update(stats, funcInfo, evalType, iterType, startTime)
 
 		// Find the next location
-		evalType, iterType, err = method.Iterate(*location, xNext)
+		evalType, iterType, err = method.Iterate(*loc, xNext)
 		if err != nil {
 			status = Failure
 			return
@@ -194,39 +194,39 @@ func getDefaultMethod(funcInfo *FunctionInfo) Method {
 // Combine location and stats because maybe in the future we'll add evaluation times
 // to functionStats?
 func getStartingLocation(f Function, funcs functions, funcInfo *FunctionInfo, initX []float64, stats *Stats, settings *Settings) (*Location, error) {
-	l := new(Location)
-	l.X = make([]float64, len(initX))
-	copy(l.X, initX)
-	if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
-		l.Gradient = make([]float64, len(l.X))
+	dim := len(initX)
+	loc := &Location{
+		X: make([]float64, dim),
 	}
+	copy(loc.X, initX)
 
 	if settings.UseInitialData {
-		l.F = settings.InitialFunctionValue
-		initG := settings.InitialGradient
+		loc.F = settings.InitialFunctionValue
 		if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
-			if len(l.Gradient) != len(initG) {
+			initG := settings.InitialGradient
+			if len(initG) != dim {
 				panic("local: initial location size mismatch")
 			}
-			copy(l.Gradient, initG)
+			loc.Gradient = make([]float64, dim)
+			copy(loc.Gradient, initG)
 		}
 	} else {
 		// Compute missing information in the initial state.
 		if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
-			evaluate(funcs, funcInfo, FunctionAndGradientEval, l.X, l, stats)
+			loc.Gradient = make([]float64, dim)
+			evaluate(funcs, funcInfo, FunctionAndGradientEval, loc.X, loc, stats)
 		} else {
-			evaluate(funcs, funcInfo, FunctionEval, l.X, l, stats)
+			evaluate(funcs, funcInfo, FunctionEval, loc.X, loc, stats)
 		}
 	}
 
-	if math.IsNaN(l.F) {
-		return l, ErrNaN
+	if math.IsNaN(loc.F) {
+		return loc, ErrNaN
 	}
-	// Do we allow Inf initial function value?
-	if math.IsInf(l.F, 1) {
-		return l, ErrInf
+	if math.IsInf(loc.F, 1) {
+		return loc, ErrInf
 	}
-	return l, nil
+	return loc, nil
 }
 
 func checkConvergence(loc Location, itertype IterationType, stats *Stats, settings *Settings) Status {
@@ -275,17 +275,17 @@ func checkConvergence(loc Location, itertype IterationType, stats *Stats, settin
 }
 
 // evaluate evaluates the function and stores the answer in place
-func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, xNext []float64, location *Location, stats *Stats) error {
-	sameX := floats.Equal(location.X, xNext)
+func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, xNext []float64, loc *Location, stats *Stats) error {
+	sameX := floats.Equal(loc.X, xNext)
 	if !sameX {
-		copy(location.X, xNext)
+		copy(loc.X, xNext)
 	}
 	switch evalType {
 	case FunctionEval:
-		location.F = funcs.function.F(location.X)
+		loc.F = funcs.function.F(loc.X)
 		if !sameX {
-			for i := range location.Gradient {
-				location.Gradient[i] = math.NaN()
+			for i := range loc.Gradient {
+				loc.Gradient[i] = math.NaN()
 			}
 			stats.GradientNorm = math.NaN()
 		}
@@ -293,28 +293,28 @@ func evaluate(funcs functions, funcInfo *FunctionInfo, evalType EvaluationType, 
 	case GradientEval:
 		if funcInfo.IsGradient {
 			if !sameX {
-				location.F = math.NaN()
+				loc.F = math.NaN()
 			}
-			funcs.gradient.Df(location.X, location.Gradient)
-			stats.GradientNorm = floats.Norm(location.Gradient, math.Inf(1))
+			funcs.gradient.Df(loc.X, loc.Gradient)
+			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
 		if funcInfo.IsFunctionGradient {
-			location.F = funcs.gradFunc.FDf(location.X, location.Gradient)
-			stats.GradientNorm = floats.Norm(location.Gradient, math.Inf(1))
+			loc.F = funcs.gradFunc.FDf(loc.X, loc.Gradient)
+			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
 		return ErrMismatch{Type: evalType}
 	case FunctionAndGradientEval:
 		if funcInfo.IsFunctionGradient {
-			location.F = funcs.gradFunc.FDf(location.X, location.Gradient)
-			stats.GradientNorm = floats.Norm(location.Gradient, math.Inf(1))
+			loc.F = funcs.gradFunc.FDf(loc.X, loc.Gradient)
+			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
 		if funcInfo.IsGradient {
-			location.F = funcs.function.F(location.X)
-			funcs.gradient.Df(location.X, location.Gradient)
-			stats.GradientNorm = floats.Norm(location.Gradient, math.Inf(1))
+			loc.F = funcs.function.F(loc.X)
+			funcs.gradient.Df(loc.X, loc.Gradient)
+			stats.GradientNorm = floats.Norm(loc.Gradient, math.Inf(1))
 			return nil
 		}
 		return ErrMismatch{Type: evalType}
