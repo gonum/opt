@@ -82,16 +82,19 @@ func Local(f Function, initX []float64, settings *Settings, method Method) (*Res
 	}
 
 	// actually perform the minimization
-	status, err := minimize(settings, loc, method, funcInfo, stats, funcs, startTime)
+	status, err := minimize(settings, &loc, method, funcInfo, stats, funcs, startTime)
+
+	var optLoc Location
+	copyLocation(&optLoc, loc)
 
 	// cleanup at exit
 	if settings.Recorder != nil && err == nil {
-		err = settings.Recorder.Record(*loc, NoEvaluation, PostIteration, stats)
+		err = settings.Recorder.Record(optLoc, NoEvaluation, PostIteration, stats)
 	}
 	stats.Runtime = time.Since(startTime)
 	return &Result{
 		Stats:    *stats,
-		Location: *loc,
+		Location: optLoc,
 		Status:   status,
 	}, err
 }
@@ -193,9 +196,9 @@ func getDefaultMethod(funcInfo *FunctionInfo) Method {
 
 // Combine location and stats because maybe in the future we'll add evaluation times
 // to functionStats?
-func getStartingLocation(f Function, funcs functions, funcInfo *FunctionInfo, initX []float64, stats *Stats, settings *Settings) (*Location, error) {
+func getStartingLocation(f Function, funcs functions, funcInfo *FunctionInfo, initX []float64, stats *Stats, settings *Settings) (Location, error) {
 	dim := len(initX)
-	loc := &Location{
+	loc := Location{
 		X: make([]float64, dim),
 	}
 	copy(loc.X, initX)
@@ -214,9 +217,9 @@ func getStartingLocation(f Function, funcs functions, funcInfo *FunctionInfo, in
 		// Compute missing information in the initial state.
 		if funcInfo.IsGradient || funcInfo.IsFunctionGradient {
 			loc.Gradient = make([]float64, dim)
-			evaluate(funcs, funcInfo, FunctionAndGradientEval, loc.X, loc, stats)
+			evaluate(funcs, funcInfo, FunctionAndGradientEval, loc.X, &loc, stats)
 		} else {
-			evaluate(funcs, funcInfo, FunctionEval, loc.X, loc, stats)
+			evaluate(funcs, funcInfo, FunctionEval, loc.X, &loc, stats)
 		}
 	}
 
