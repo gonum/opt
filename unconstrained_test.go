@@ -7,6 +7,7 @@ package optimize
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -505,128 +506,156 @@ func TestLocal(t *testing.T) {
 }
 
 func TestGradientDescent(t *testing.T) {
-	testLocal(t, gradientDescentTests, &GradientDescent{})
+	method := &GradientDescent{}
+	testLocal(t, gradientDescentTests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestGradientDescentBacktracking(t *testing.T) {
-	testLocal(t, gradientDescentTests, &GradientDescent{
+	method := &GradientDescent{
 		LinesearchMethod: &Backtracking{
 			FunConst: 0.1,
 		},
-	})
+	}
+	testLocal(t, gradientDescentTests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestGradientDescentBisection(t *testing.T) {
-	testLocal(t, gradientDescentTests, &GradientDescent{
+	method := &GradientDescent{
 		LinesearchMethod: &Bisection{},
-	})
+	}
+	testLocal(t, gradientDescentTests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestCG(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{})
+	method := &CG{}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestFletcherReevesQuadStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &FletcherReeves{},
 		InitialStep: &QuadraticStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestFletcherReevesFirstOrderStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &FletcherReeves{},
 		InitialStep: &FirstOrderStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestHestenesStiefelQuadStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &HestenesStiefel{},
 		InitialStep: &QuadraticStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestHestenesStiefelFirstOrderStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &HestenesStiefel{},
 		InitialStep: &FirstOrderStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestPolakRibiereQuadStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &PolakRibierePolyak{},
 		InitialStep: &QuadraticStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestPolakRibiereFirstOrderStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &PolakRibierePolyak{},
 		InitialStep: &FirstOrderStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestDaiYuanQuadStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &DaiYuan{},
 		InitialStep: &QuadraticStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestDaiYuanFirstOrderStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &DaiYuan{},
 		InitialStep: &FirstOrderStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestHagerZhangQuadStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &HagerZhang{},
 		InitialStep: &QuadraticStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestHagerZhangFirstOrderStep(t *testing.T) {
 	var tests []unconstrainedTest
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, cgTests...)
-	testLocal(t, tests, &CG{
+	method := &CG{
 		Variant:     &HagerZhang{},
 		InitialStep: &FirstOrderStepSize{},
-	})
+	}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
 }
 
 func TestBFGS(t *testing.T) {
@@ -634,7 +663,10 @@ func TestBFGS(t *testing.T) {
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, newtonTests...)
 	tests = append(tests, bfgsTests...)
-	testLocal(t, tests, &BFGS{})
+	method := &BFGS{}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
+	testLocalFromPerturbedMinima(t, method, 1e-4)
 }
 
 func TestLBFGS(t *testing.T) {
@@ -642,7 +674,10 @@ func TestLBFGS(t *testing.T) {
 	tests = append(tests, gradientDescentTests...)
 	tests = append(tests, newtonTests...)
 	tests = append(tests, lbfgsTests...)
-	testLocal(t, tests, &LBFGS{})
+	method := &LBFGS{}
+	testLocal(t, tests, method)
+	testLocalFromMinima(t, method)
+	testLocalFromPerturbedMinima(t, method, 1e-4)
 }
 
 func testLocal(t *testing.T, tests []unconstrainedTest, method Method) {
@@ -753,6 +788,116 @@ func testLocal(t *testing.T, tests []unconstrainedTest, method Method) {
 					t.Errorf("Providing initial data does not reduce the number of gradient calls for:\n%v", test)
 					continue
 				}
+			}
+		}
+	}
+}
+
+var unconstrainedFuncs = []Function{
+	funcs.Beale{},
+	funcs.BiggsEXP2{},
+	funcs.BiggsEXP3{},
+	funcs.BiggsEXP4{},
+	funcs.BiggsEXP5{},
+	funcs.BiggsEXP6{},
+	funcs.Box3D{},
+	funcs.BrownBadlyScaled{},
+	funcs.BrownAndDennis{},
+	funcs.ExtendedPowellSingular{},
+	funcs.ExtendedRosenbrock{},
+	funcs.Gaussian{},
+	funcs.GulfResearchAndDevelopment{},
+	funcs.HelicalValley{},
+	funcs.Linear{},
+	funcs.PenaltyI{},
+	funcs.PenaltyII{},
+	funcs.PowellBadlyScaled{},
+	funcs.Trigonometric{},
+	funcs.VariablyDimensioned{},
+	funcs.Watson{},
+	funcs.Wood{},
+}
+
+// testLocalFromMinima tests if Local() can find the minimum with method when
+// the starting point is the minimum itself.
+// This test will probably have to be revised once derivative-free methods are
+// introduced or not used for such methods.
+func testLocalFromMinima(t *testing.T, method Method) {
+	// Keep this here until functions.minimumer is exported.
+	type minimumer interface {
+		Minima() []funcs.Minimum
+	}
+
+	for _, f := range unconstrainedFuncs {
+		minimumer, isMinimumer := f.(minimumer)
+		if !isMinimumer {
+			continue
+		}
+
+		settings := &Settings{
+			FunctionAbsTol: math.Inf(-1),
+			GradientAbsTol: 1e-9, // Gradients at all the minima have their inf norm smaller than this value...
+		}
+		// ... except for BrownAndDennis whose minimum is known with much less accuracy.
+		if reflect.TypeOf(f) == reflect.TypeOf(funcs.BrownAndDennis{}) {
+			settings.GradientAbsTol = 1e-5
+		}
+
+		for i, min := range minimumer.Minima() {
+			// Try starting the optimizer from an optimum location given by min.X.
+			result, err := Local(f, min.X, settings, method)
+			if err != nil {
+				t.Errorf("%v, minimum #%d: error finding minimum from an optimum location (%v)",
+					reflect.TypeOf(f), i, err)
+			}
+			// Minimization should not have started at all because all minima
+			// are known with at least the above accuracy.
+			if result.MajorIterations > 0 {
+				t.Errorf("%v, minimum #%d: too many iterations", reflect.TypeOf(f), i)
+			}
+		}
+	}
+}
+
+// testLocalFromPerturbedMinima tests the ability of method to find a minimum
+// when the starting point is located in the neighborhood of the minimum. Size
+// of the neighborhood is determined by scale.
+// Note that this test is very difficult to pass.
+func testLocalFromPerturbedMinima(t *testing.T, method Method, scale float64) {
+	// Keep this here until functions.minimumer is exported.
+	type minimumer interface {
+		Minima() []funcs.Minimum
+	}
+
+	for _, f := range unconstrainedFuncs {
+		minimumer, isMinimumer := f.(minimumer)
+		if !isMinimumer {
+			continue
+		}
+		// Skip BrownAndDennis as it is notoriously difficult to minimize, even
+		// more so when starting in the neighborhood of its minimum.
+		if reflect.TypeOf(f) == reflect.TypeOf(funcs.BrownAndDennis{}) {
+			continue
+		}
+
+		settings := &Settings{
+			FunctionAbsTol: math.Inf(-1),
+			GradientAbsTol: 1e-6,
+		}
+		for i, min := range minimumer.Minima() {
+			// Perturb the minimum and try starting the minimizer from there.
+			for j, v := range min.X {
+				// TODO(vladimir-ch): What is the best way to perturb the minimum for testing?
+				// c is uniformly distributed in [-scale, scale)
+				// c := scale * (2*rand.Float64() - 1)
+				// c is one of {-scale, 0, scale}
+				c := scale * float64(rand.Intn(3)-1)
+				min.X[j] = (1 + c) * v
+			}
+			_, err2 := Local(f, min.X, settings, method)
+			if err2 != nil {
+				t.Errorf("%v, minimum #%d: error finding minimum from randomly perturbed optimum location (%v)",
+					reflect.TypeOf(f), i, err2)
 			}
 		}
 	}
