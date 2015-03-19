@@ -101,7 +101,7 @@ var gradientDescentTests = []unconstrainedTest{
 	},
 	{
 		f: functions.HelicalValley{},
-		x: []float64{-1, 0, 0},
+		x: []float64{-1.000001, 0, 0},
 	},
 	{
 		f: functions.HelicalValley{},
@@ -519,6 +519,10 @@ func TestGradientDescentBisection(t *testing.T) {
 	testLocal(t, gradientDescentTests, &GradientDescent{
 		LinesearchMethod: &Bisection{},
 	})
+}
+
+func TestCoordinateDescent(t *testing.T) {
+	testLocal(t, gradientDescentTests, &CoordinateDescent{})
 }
 
 func TestCG(t *testing.T) {
