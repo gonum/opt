@@ -20,6 +20,7 @@ type Bisection struct {
 	initF float64
 	minF  float64
 	maxF  float64
+	f     float64
 
 	initGrad float64
 	minGrad  float64
@@ -50,19 +51,27 @@ func (b *Bisection) Init(f, g float64, step float64) Operation {
 	b.initF = f
 	b.minF = f
 	b.maxF = math.NaN()
+	b.f = math.NaN()
 
 	b.initGrad = g
 	b.minGrad = g
 	b.maxGrad = math.NaN()
 
-	b.lastOp = FuncEvaluation | GradEvaluation
+	b.lastOp = FuncEvaluation
 	return b.lastOp
 }
 
 func (b *Bisection) Iterate(f, g float64) (Operation, float64, error) {
-	if b.lastOp != FuncEvaluation|GradEvaluation {
+	if b.lastOp&(FuncEvaluation|GradEvaluation) == 0 {
 		panic("bisection: Init has not been called")
 	}
+
+	if b.lastOp == FuncEvaluation {
+		b.f = f
+		b.lastOp = GradEvaluation
+		return b.lastOp, b.currStep, nil
+	}
+	f = b.f
 
 	// Don't finish the linesearch until a minimum is found that is better than
 	// the best point found so far. We want to end up in the lowest basin of
@@ -146,6 +155,6 @@ func (b *Bisection) nextStep(step float64) (Operation, float64, error) {
 		return b.lastOp, b.currStep, ErrLinesearcherFailure
 	}
 	b.currStep = step
-	b.lastOp = FuncEvaluation | GradEvaluation
+	b.lastOp = FuncEvaluation
 	return b.lastOp, b.currStep, nil
 }
