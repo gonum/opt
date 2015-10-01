@@ -22,8 +22,6 @@ type Bisection struct {
 	maxF  float64
 
 	initGrad float64
-	minGrad  float64
-	maxGrad  float64
 
 	lastOp Operation
 }
@@ -52,8 +50,6 @@ func (b *Bisection) Init(f, g float64, step float64) Operation {
 	b.maxF = math.NaN()
 
 	b.initGrad = g
-	b.minGrad = g
-	b.maxGrad = math.NaN()
 
 	b.lastOp = FuncEvaluation | GradEvaluation
 	return b.lastOp
@@ -87,7 +83,6 @@ func (b *Bisection) Iterate(f, g float64) (Operation, float64, error) {
 			// Found a change in derivative sign, so this is the new maximum
 			b.maxStep = b.currStep
 			b.maxF = f
-			b.maxGrad = g
 			return b.nextStep((b.minStep + b.maxStep) / 2)
 		case f <= b.minF:
 			// Still haven't found an upper bound, but there is not an increase in
@@ -95,7 +90,6 @@ func (b *Bisection) Iterate(f, g float64) (Operation, float64, error) {
 			// that direction.
 			b.minStep = b.currStep
 			b.minF = f
-			b.minGrad = g
 			return b.nextStep(b.currStep * 2)
 		default:
 			// Increase in function value, but the gradient is still negative.
@@ -103,7 +97,6 @@ func (b *Bisection) Iterate(f, g float64) (Operation, float64, error) {
 			// as the new maximum
 			b.maxStep = b.currStep
 			b.maxF = f
-			b.maxGrad = g
 			return b.nextStep((b.minStep + b.maxStep) / 2)
 		}
 	}
@@ -114,22 +107,18 @@ func (b *Bisection) Iterate(f, g float64) (Operation, float64, error) {
 		if g < 0 {
 			b.minStep = b.currStep
 			b.minF = f
-			b.minGrad = g
 		} else {
 			b.maxStep = b.currStep
 			b.maxF = f
-			b.maxGrad = g
 		}
 	} else {
 		// We found a higher point. Want to push toward the minimal bound
 		if b.minF <= b.maxF {
 			b.maxStep = b.currStep
 			b.maxF = f
-			b.maxGrad = g
 		} else {
 			b.minStep = b.currStep
 			b.minF = f
-			b.minGrad = g
 		}
 	}
 	return b.nextStep((b.minStep + b.maxStep) / 2)
