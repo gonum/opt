@@ -13,20 +13,16 @@ import "math"
 type Bisection struct {
 	GradConst float64
 
-	minStep  float64
-	maxStep  float64
-	currStep float64
-
-	initF float64
-	minF  float64
-	maxF  float64
-
-	initGrad float64
-	minGrad  float64
-	maxGrad  float64
-
-	lastOp Operation
+	initF     float64
+	initAbsG  float64
+	step      [3]float64
+	f         [3]float64
+	k         int
+	bracketed bool
+	lastOp    Operation
 }
+
+const golden float64 = 1.61803398875
 
 func (b *Bisection) Init(f, g float64, step float64) Operation {
 	if step <= 0 {
@@ -43,109 +39,134 @@ func (b *Bisection) Init(f, g float64, step float64) Operation {
 		panic("bisection: GradConst not between 0 and 1")
 	}
 
-	b.minStep = 0
-	b.maxStep = math.Inf(1)
-	b.currStep = step
-
 	b.initF = f
-	b.minF = f
-	b.maxF = math.NaN()
+	b.initAbsG = math.Abs(g)
+	b.step = [3]float64{0, step, math.NaN()}
+	b.f = [3]float64{f, math.NaN(), math.NaN()}
+	b.k = 1
+	b.bracketed = false
 
-	b.initGrad = g
-	b.minGrad = g
-	b.maxGrad = math.NaN()
-
-	b.lastOp = FuncEvaluation | GradEvaluation
+	b.lastOp = FuncEvaluation
 	return b.lastOp
 }
 
 func (b *Bisection) Iterate(f, g float64) (Operation, float64, error) {
-	if b.lastOp != FuncEvaluation|GradEvaluation {
+	if b.lastOp&(FuncEvaluation|GradEvaluation) == 0 {
 		panic("bisection: Init has not been called")
+	}
+
+	k := b.k
+	// Make sure that f is up-to-date.
+	if b.lastOp == FuncEvaluation {
+		b.f[k] = f
 	}
 
 	// Don't finish the linesearch until a minimum is found that is better than
 	// the best point found so far. We want to end up in the lowest basin of
 	// attraction
-	minF := b.initF
-	if b.maxF < minF {
-		minF = b.maxF
+	minF := b.f[0]
+	if b.f[1] < minF {
+		minF = b.f[1]
 	}
-	if b.minF < minF {
-		minF = b.minF
+	if b.f[2] < minF {
+		minF = b.f[2]
 	}
-	if StrongWolfeConditionsMet(f, g, minF, b.initGrad, b.currStep, 0, b.GradConst) {
-		b.lastOp = MajorIteration
-		return b.lastOp, b.currStep, nil
-	}
-
-	// Deciding on the next step size
-	if math.IsInf(b.maxStep, 1) {
-		// Have not yet bounded the minimum
-		switch {
-		case g > 0:
-			// Found a change in derivative sign, so this is the new maximum
-			b.maxStep = b.currStep
-			b.maxF = f
-			b.maxGrad = g
-			return b.nextStep((b.minStep + b.maxStep) / 2)
-		case f <= b.minF:
-			// Still haven't found an upper bound, but there is not an increase in
-			// function value and the gradient is still negative, so go more in
-			// that direction.
-			b.minStep = b.currStep
-			b.minF = f
-			b.minGrad = g
-			return b.nextStep(b.currStep * 2)
-		default:
-			// Increase in function value, but the gradient is still negative.
-			// Means we must have skipped over a local minimum, so set this point
-			// as the new maximum
-			b.maxStep = b.currStep
-			b.maxF = f
-			b.maxGrad = g
-			return b.nextStep((b.minStep + b.maxStep) / 2)
+	if b.f[k] <= minF {
+		// The step satisfies the Armijo condition.
+		// Request the derivative, if necessary, and check the curvature
+		// condition.
+		if b.lastOp != GradEvaluation {
+			b.lastOp = GradEvaluation
+			return b.lastOp, b.step[k], nil
+		}
+		if math.Abs(g) < b.GradConst*b.initAbsG {
+			b.lastOp = MajorIteration
+			return b.lastOp, b.step[k], nil
 		}
 	}
 
-	// Already bounded the minimum, but wolfe conditions not met. Need to step to
-	// find minimum.
-	if f <= b.minF && f <= b.maxF {
-		if g < 0 {
-			b.minStep = b.currStep
-			b.minF = f
-			b.minGrad = g
+	// Continue the search because the step is not satisfactory.
+
+	if !b.bracketed {
+		// We have bracketed a local minimum whenever the downhill trend has
+		// stopped either because the function value has increased or because
+		// the derivative (if available) is positive.
+		upF := b.f[k] > b.f[k-1]
+		upG := b.lastOp == GradEvaluation && g > 0
+		if upF || upG {
+			b.bracketed = true
+			switch {
+			case k == 1: // A minimum is between step[0] and step[1].
+				b.step[2] = b.step[1]
+				b.f[2] = b.f[1]
+			case upG: // A minimum is between step[1] and step[2].
+				b.step[0] = b.step[1]
+				b.f[0] = b.f[1]
+			default: // A minimum is between step[0] and step[2].
+			}
+			// Invalidate the middle element.
+			b.step[1] = math.NaN()
+			b.f[1] = math.NaN()
+			// From now on store step and f in the middle element.
+			b.k = 1
+			return b.nextStep()
+		}
+		// No minimum has been bracketed yet. Slide forward discarding
+		// the left-most step.
+		if k == 1 {
+			b.k = 2
+			b.step[2] = (1 + golden) * b.step[1]
 		} else {
-			b.maxStep = b.currStep
-			b.maxF = f
-			b.maxGrad = g
+			s2 := b.step[2]
+			b.step = [3]float64{b.step[1], s2, s2 + golden*(s2-b.step[1])}
+			b.f = [3]float64{b.f[1], b.f[2], math.NaN()}
+		}
+		b.lastOp = FuncEvaluation
+		return b.lastOp, b.step[2], nil
+	}
+
+	// Already bracketed the minimum, but Wolfe conditions are still not met.
+
+	if b.f[1] <= b.f[0] && b.f[1] <= b.f[2] {
+		// Value at midpoint is smaller than at either endpoint.
+		// We need the derivative to decide where to go.
+		if b.lastOp != GradEvaluation {
+			b.lastOp = GradEvaluation
+			return b.lastOp, b.step[1], nil
+		}
+		if g < 0 {
+			b.step[0] = b.step[1]
+			b.f[0] = b.f[1]
+		} else {
+			b.step[2] = b.step[1]
+			b.f[2] = b.f[1]
 		}
 	} else {
-		// We found a higher point. Want to push toward the minimal bound
-		if b.minF <= b.maxF {
-			b.maxStep = b.currStep
-			b.maxF = f
-			b.maxGrad = g
+		// We found a higher point. Push toward the minimal bound.
+		if b.f[0] <= b.f[2] {
+			b.step[2] = b.step[1]
+			b.f[2] = b.f[1]
 		} else {
-			b.minStep = b.currStep
-			b.minF = f
-			b.minGrad = g
+			b.step[0] = b.step[1]
+			b.f[0] = b.f[1]
 		}
 	}
-	return b.nextStep((b.minStep + b.maxStep) / 2)
+	return b.nextStep()
 }
 
-// nextStep checks if the new step is equal to the old step.
-// This can happen if min and max are the same, or if the step size is infinity,
-// both of which indicate the minimization must stop. If the steps are different,
-// it sets the new step size and returns the evaluation type and the step. If the steps
-// are the same, it returns an error.
-func (b *Bisection) nextStep(step float64) (Operation, float64, error) {
-	if b.currStep == step {
+// nextStep computes the new step and checks if it is equal to the old one.
+// This can happen if min and max are the same, or if the step size is
+// infinity, both of which indicate the minimization must stop.
+// If the steps are different, it sets the new step size and returns the
+// evaluation type and the step.
+// If the steps are the same, it returns an error.
+func (b *Bisection) nextStep() (Operation, float64, error) {
+	step := (b.step[0] + b.step[2]) / 2
+	if b.step[1] == step {
 		b.lastOp = NoOperation
-		return b.lastOp, b.currStep, ErrLinesearcherFailure
+		return b.lastOp, b.step[1], ErrLinesearcherFailure
 	}
-	b.currStep = step
-	b.lastOp = FuncEvaluation | GradEvaluation
-	return b.lastOp, b.currStep, nil
+	b.step[1] = step
+	b.lastOp = FuncEvaluation
+	return b.lastOp, b.step[1], nil
 }
