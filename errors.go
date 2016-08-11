@@ -28,6 +28,8 @@ var (
 	// due to floating-point arithmetic.
 	ErrNoProgress = errors.New("linesearch: no change in location after Linesearcher step")
 
+	ErrFunctionConvergeNil = errors.New("global: function convergence must not be nil")
+
 	// ErrLinesearcherBound signifies that a Linesearcher reached a step that
 	// lies out of allowed bounds.
 	ErrLinesearcherBound = errors.New("linesearch: step out of bounds")
@@ -65,3 +67,8 @@ func (err ErrGrad) Error() string {
 		panic("optimize: bad ErrGrad")
 	}
 }
+
+// List of shared panic strings
+var (
+	badProblem = "optimize: objective function is undefined"
+)
